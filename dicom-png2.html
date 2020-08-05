@@ -1,0 +1,153 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<div id="content">
+    <canvas id="img-mpr-axial" class="mpr" height="512" width="512" οndragstart="return false;" oncontextmenu="return false;"></canvas>
+    </div>
+    <canvas id="can" width="512" height="512" style="border:1px solid #d3d3d3;">
+   <script type="text/javascript" src="UPNG.js"></script>
+   <script type="text/javascript" src="html2canvas.min.js"></script>
+    <script>
+
+
+//return a promise that resolves with a File instance
+function urltoFile(url, filename, mimeType){
+    mimeType = mimeType || (url.match(/^data:([^;]+);/)||'')[1];
+    return (fetch(url)
+        .then(function(res){return res.arrayBuffer();})
+        .then(function(buf){return new File([buf], filename, {type:mimeType});})
+    );
+}
+
+function drawCustomImage(context, imageData, imgWidth, imgHeight, bufView) {
+    window_center = -600;
+    window_width = 1200;
+    let min = (2 * window_center - window_width) / 2.0 + 0.5;
+    let max = (2 * window_center + window_width) / 2.0 + 0.5;
+    let maxmin = 255.0 / (max-min);
+    pos = 0; // index position into imagedata array
+    for (y = 0; y < imgHeight; y++) {
+        for (x = 0; x < imgWidth; x++) {
+            let pixel = bufView[y * imgWidth + x];
+            //let c = (pixel - min) * 255.0 / (max - min);
+            let c = (pixel - min) * maxmin;
+            c = Math.max(0,Math.min(255, c));
+            // set red, green, blue, and alpha:
+            imageData.data[pos++] = c;//r
+            imageData.data[pos++] = c;//g
+            imageData.data[pos++] = c;//b
+            imageData.data[pos++] = 255; // opaque alpha
+        }
+    }
+    // copy the image data back onto the canvas
+    context.putImageData(imageData, 0, 0);
+}
+
+function u8_to_u16(png) {
+    var raw8bit = png.data;
+    var len = png.height * png.width * 2;
+    var buf = new ArrayBuffer(len); // 2 bytes for each char
+    var bufView = new Int16Array(buf);
+    var index = 0;
+    let min = 100000.0, max = -100000.0;
+    for (var i=0; i<len; i+=2) {
+        var lower = raw8bit[i+1];
+        var upper = raw8bit[i];
+        bufView[index] = lower + (upper <<8);
+        bufView[index] -= 32768;
+        
+        if(bufView[index] > max) max = bufView[index];
+        if(bufView[index] < min) min = bufView[index];
+        index++;
+    }
+    console.log('min=', min, '\t max=', max);
+    return bufView;
+ }
+        
+    /**
+     * @param url 图片路径
+     */
+    function getUrlBase64(url) {
+      return new Promise((resolve, reject) => {
+        let canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        let img = new Image();
+        img.crossOrigin = "Anonymous"; //开启img的“跨域”模式
+        img.src = url;
+        img.onload = function() {
+          canvas.height = img.height;
+          canvas.width = img.width;
+          ctx.drawImage(img, 0, 0, img.width, img.height); //参数可自定义
+          const dataURL = canvas.toDataURL("image/jpeg",1); //获取Base64编码
+          resolve(dataURL);
+          canvas = null; //清除canvas元素
+          img = null; //清除img元素
+        };
+        img.onerror = function() {
+          reject(new Error("Could not load image at " + url));
+        };
+      });
+    }
+   
+  
+imgSrc = 'http://mpr.hcxjingdong.com/getdcm?path=01/000001.dcm';
+
+drawing = new Image();
+drawing.src = imgSrc; // can also be a remote URL e.g. http://
+var canvas = document.getElementById('img-mpr-axial');
+var ctx = canvas.getContext('2d');
+//drawing.crossOrigin = '';
+drawing.setAttribute("crossOrigin",'Anonymous');
+drawing.onload = function() {
+   ctx.drawImage(drawing,0,0);
+   //var imageData = ctx.getImageData(0,0,canvas.width, canvas.height);
+   show_image();
+};
+
+
+function _base64ToArrayBuffer(base64) {
+   // var binary_string = atob(base64);
+    var binary_string = atob(base64.substring(base64.indexOf(',') + 1));
+    var len = binary_string.length;
+    var bytes = new Uint8Array(len);
+    for (var i = 0; i < len; i++) {
+        bytes[i] = binary_string.charCodeAt(i);
+    }
+    return bytes.buffer;
+}
+
+function show_image(){
+    getUrlBase64(imgSrc).then(base64 => {
+       urltoFile(imgSrc, 'a.png')//imgSrc canvas_url
+          .then(function(file){
+             console.log(file);
+             var reader = new FileReader();
+             var fileByteArray = [];
+             reader.readAsArrayBuffer(file);
+             reader.onloadend = function (evt) {
+                if (evt.target.readyState == FileReader.DONE) {
+                   var arrayBuffer = evt.target.result,
+                      array = new Uint8Array(arrayBuffer);
+                   let png = UPNG.decode(array);
+                   let bufView = u8_to_u16(png); 
+                   var canvas = document.getElementById('can');
+                   var ctx = canvas.getContext('2d');
+                   var imageData = ctx.getImageData(0,0,canvas.width, canvas.height);
+                   drawCustomImage(ctx, imageData, canvas.width, canvas.height, bufView);
+                }
+             }
+          })
+    }).catch((err)=>{
+       //err处理
+    });
+}
+
+    </script>
+</body>
+</html>
