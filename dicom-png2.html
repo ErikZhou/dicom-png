@@ -148,6 +148,31 @@ function show_image(){
     });
 }
 
+function load_mpr(){
+ 
+    imgSrc = '/000001.dcm';
+    console.log(imgSrc);
+    //getBase64(imgSrc);
+    
+    var request = new XMLHttpRequest();
+    request.responseType = 'arraybuffer';
+    request.open('GET', imgSrc);
+    request.onload = function() {
+        console.log(request.response);
+        console.log(request.response.byteLength);
+        arrayBuffer = request.response;
+        array = new Uint8Array(arrayBuffer);
+        let png = UPNG.decode(array);
+        let bufView = u8_to_u16(png); 
+        var canvas = document.getElementById('img-mpr-axial');
+        var ctx = canvas.getContext('2d');
+        var imageData = ctx.getImageData(0,0,canvas.width, canvas.height);
+        drawCustomImage(ctx, imageData, canvas.width, canvas.height, bufView);
+
+    };
+    request.send();
+
+ }
     </script>
 </body>
 </html>
